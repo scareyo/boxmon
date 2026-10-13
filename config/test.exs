@@ -38,4 +38,5 @@ config :boxmon, :seedbox,
   http_user: "user",
   http_pass: "pass",
   download_dir: "tmp/test-downloads",
+  chunk_size: 4,
   req_options: [plug: {Req.Test, Boxmon.Seedbox}, retry: false]

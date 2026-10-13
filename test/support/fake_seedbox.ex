@@ -6,6 +6,7 @@ defmodule Boxmon.FakeSeedbox do
     * `:torrents` - qBittorrent `/torrents/info` JSON
     * `:files` - map of hash => qBittorrent `/torrents/files` JSON
     * `:content` - map of encoded request path => file body
+    * `:ranges` - whether the file server supports byte ranges (default true)
   """
   import Plug.Conn
 
@@ -44,7 +45,26 @@ defmodule Boxmon.FakeSeedbox do
   defp handle(conn, opts) do
     case Map.get(Keyword.get(opts, :content, %{}), conn.request_path) do
       nil -> send_resp(conn, 404, "not found")
-      body -> send_resp(conn, 200, body)
+      body -> serve(conn, body, Keyword.get(opts, :ranges, true))
     end
   end
+
+  defp serve(%{method: "HEAD"} = conn, _body, ranges) do
+    conn
+    |> put_resp_header("accept-ranges", if(ranges, do: "bytes", else: "none"))
+    |> send_resp(200, "")
+  end
+
+  defp serve(conn, body, true) do
+    case get_req_header(conn, "range") do
+      ["bytes=" <> range] ->
+        [from, to] = range |> String.split("-") |> Enum.map(&String.to_integer/1)
+        send_resp(conn, 206, binary_part(body, from, to - from + 1))
+
+      [] ->
+        send_resp(conn, 200, body)
+    end
+  end
+
+  defp serve(conn, body, false), do: send_resp(conn, 200, body)
 end

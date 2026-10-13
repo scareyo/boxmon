@@ -17,11 +17,28 @@ defmodule Boxmon.DownloaderTest do
       content: %{"/dl/My%20Show/ep%201.mkv" => "hello", "/dl/My%20Show/ep2.mkv" => "abc"}
     )
 
-    assert :ok = Downloader.download(@torrent, @files, &send(self(), {:bytes, &1}))
+    test_pid = self()
+    assert :ok = Downloader.download(@torrent, @files, &send(test_pid, {:bytes, &1}))
     assert File.read!(Path.join(dir, "My Show/ep 1.mkv")) == "hello"
     assert File.read!(Path.join(dir, "My Show/ep2.mkv")) == "abc"
-    assert_received {:bytes, 5}
-    assert_received {:bytes, 3}
+    assert received_bytes() == 8
+  end
+
+  # chunk_size is 4 in test, so these 26 bytes arrive as 7 parallel ranges.
+  test "assembles large files from parallel ranged chunks", %{tmp_dir: dir} do
+    body = "abcdefghijklmnopqrstuvwxyz"
+    FakeSeedbox.stub(content: %{"/dl/big.bin" => body})
+
+    assert :ok = Downloader.download(@torrent, [%{name: "big.bin", size: 26}], fn _ -> :ok end)
+    assert File.read!(Path.join(dir, "big.bin")) == body
+  end
+
+  test "streams the whole file when the server doesn't support ranges", %{tmp_dir: dir} do
+    body = "abcdefghijklmnopqrstuvwxyz"
+    FakeSeedbox.stub(content: %{"/dl/big.bin" => body}, ranges: false)
+
+    assert :ok = Downloader.download(@torrent, [%{name: "big.bin", size: 26}], fn _ -> :ok end)
+    assert File.read!(Path.join(dir, "big.bin")) == body
   end
 
   test "skips files already on disk", %{tmp_dir: dir} do
@@ -46,5 +63,13 @@ defmodule Boxmon.DownloaderTest do
 
     torrent = %{@torrent | save_path: "/data/../etc"}
     assert {:error, _} = Downloader.download(torrent, @files, fn _ -> :ok end)
+  end
+
+  defp received_bytes(total \\ 0) do
+    receive do
+      {:bytes, n} -> received_bytes(total + n)
+    after
+      0 -> total
+    end
   end
 end
