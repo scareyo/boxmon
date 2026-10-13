@@ -26,3 +26,17 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# The monitor is started per test; HTTP goes to Req.Test stubs.
+config :boxmon, start_monitor: false
+
+config :boxmon, :seedbox,
+  qbit_url: "http://qbit.test",
+  qbit_user: "admin",
+  qbit_pass: "secret",
+  remote_root: "/data",
+  http_url: "http://files.test/dl",
+  http_user: "user",
+  http_pass: "pass",
+  download_dir: "tmp/test-downloads",
+  req_options: [plug: {Req.Test, Boxmon.Seedbox}, retry: false]

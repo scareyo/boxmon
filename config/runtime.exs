@@ -23,6 +23,18 @@ end
 config :boxmon, BoxmonWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if config_env() != :test do
+  config :boxmon, :seedbox,
+    qbit_url: System.get_env("QBIT_URL"),
+    qbit_user: System.get_env("QBIT_USER"),
+    qbit_pass: System.get_env("QBIT_PASS"),
+    remote_root: System.get_env("REMOTE_ROOT", "/"),
+    http_url: System.get_env("HTTP_URL"),
+    http_user: System.get_env("HTTP_USER"),
+    http_pass: System.get_env("HTTP_PASS"),
+    download_dir: System.get_env("DOWNLOAD_DIR", "downloads")
+end
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

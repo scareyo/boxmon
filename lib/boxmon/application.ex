@@ -7,15 +7,18 @@ defmodule Boxmon.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      BoxmonWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:boxmon, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Boxmon.PubSub},
-      # Start a worker by calling: Boxmon.Worker.start_link(arg)
-      # {Boxmon.Worker, arg},
-      # Start to serve requests, typically the last entry
-      BoxmonWeb.Endpoint
-    ]
+    children =
+      [
+        BoxmonWeb.Telemetry,
+        {DNSCluster, query: Application.get_env(:boxmon, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Boxmon.PubSub},
+        {Task.Supervisor, name: Boxmon.TaskSup}
+      ] ++
+        if(Application.get_env(:boxmon, :start_monitor, true), do: [Boxmon.Monitor], else: []) ++
+        [
+          # Start to serve requests, typically the last entry
+          BoxmonWeb.Endpoint
+        ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
