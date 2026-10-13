@@ -32,12 +32,6 @@ defmodule Boxmon.FakeSeedbox do
     ExUnit.Callbacks.on_exit(fn -> Application.put_env(:boxmon, :seedbox, config) end)
   end
 
-  defp handle(%{request_path: "/api/v2/auth/login"} = conn, _opts) do
-    conn
-    |> put_resp_header("set-cookie", "SID=abc123; HttpOnly; path=/")
-    |> send_resp(200, "Ok.")
-  end
-
   defp handle(%{request_path: "/api/v2/torrents/info"} = conn, opts) do
     Req.Test.json(conn, Keyword.get(opts, :torrents, []))
   end

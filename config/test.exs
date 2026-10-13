@@ -32,8 +32,7 @@ config :boxmon, start_monitor: false
 
 config :boxmon, :seedbox,
   qbit_url: "http://qbit.test",
-  qbit_user: "admin",
-  qbit_pass: "secret",
+  qbit_api_key: "qbt_test",
   remote_root: "/data",
   http_url: "http://files.test/dl",
   http_user: "user",

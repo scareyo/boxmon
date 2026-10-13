@@ -27,7 +27,6 @@ defmodule Boxmon.Monitor do
 
     {:ok,
      %{
-       sid: nil,
        timer: nil,
        polling: nil,
        current: nil,
@@ -53,8 +52,7 @@ defmodule Boxmon.Monitor do
   @impl true
   def handle_info(:poll, %{polling: nil} = state) do
     if state.timer, do: Process.cancel_timer(state.timer)
-    sid = state.sid
-    task = Task.Supervisor.async_nolink(Boxmon.TaskSup, fn -> fetch_torrents(sid) end)
+    task = Task.Supervisor.async_nolink(Boxmon.TaskSup, &Qbit.torrents/0)
     {:noreply, %{state | timer: nil, polling: task.ref}}
   end
 
@@ -106,12 +104,12 @@ defmodule Boxmon.Monitor do
 
     state =
       case result do
-        {:ok, sid, torrents} ->
-          %{state | sid: sid, torrents: torrents, error: nil, polled_at: DateTime.utc_now()}
+        {:ok, torrents} ->
+          %{state | torrents: torrents, error: nil, polled_at: DateTime.utc_now()}
 
         {:error, reason} ->
           Logger.warning("Polling qBittorrent failed: #{reason}")
-          %{state | sid: nil, error: to_string(reason)}
+          %{state | error: reason}
       end
 
     {:noreply, state |> maybe_start_download() |> broadcast()}
@@ -122,23 +120,7 @@ defmodule Boxmon.Monitor do
     {:noreply, state |> maybe_start_download() |> broadcast()}
   end
 
-  # Logs in when there's no session, or once more if the session expired.
-  defp fetch_torrents(nil) do
-    with {:ok, sid} <- Qbit.login(),
-         {:ok, torrents} <- Qbit.torrents(sid) do
-      {:ok, sid, torrents}
-    end
-  end
-
-  defp fetch_torrents(sid) do
-    case Qbit.torrents(sid) do
-      {:ok, torrents} -> {:ok, sid, torrents}
-      {:error, :forbidden} -> fetch_torrents(nil)
-      error -> error
-    end
-  end
-
-  defp maybe_start_download(%{current: nil, sid: sid} = state) when sid != nil do
+  defp maybe_start_download(%{current: nil, error: nil} = state) do
     case next_torrent(state) do
       nil ->
         state
@@ -148,7 +130,7 @@ defmodule Boxmon.Monitor do
 
         task =
           Task.Supervisor.async_nolink(Boxmon.TaskSup, fn ->
-            with {:ok, files} <- Qbit.files(sid, torrent.hash) do
+            with {:ok, files} <- Qbit.files(torrent.hash) do
               Downloader.download(torrent, files, &send(monitor, {:progress, &1}))
             end
           end)
