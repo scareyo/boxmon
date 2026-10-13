@@ -12,17 +12,17 @@ defmodule Boxmon.Downloader do
   Downloads every file, calling `on_progress.(bytes)` as bytes arrive.
   """
   def download(torrent, files, on_progress) do
+    config = config()
+
     Enum.reduce_while(files, :ok, fn file, :ok ->
-      case download_file(torrent, file, on_progress) do
+      case download_file(torrent, file, config, on_progress) do
         :ok -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
 
-  defp download_file(torrent, file, on_progress) do
-    config = config()
-
+  defp download_file(torrent, file, config, on_progress) do
     with {:ok, rel} <- relative_path(Path.join(torrent.save_path, file.name), config) do
       dest = Path.join(config[:download_dir], rel)
 
@@ -30,18 +30,18 @@ defmodule Boxmon.Downloader do
         on_progress.(file.size)
         :ok
       else
-        fetch(url(rel, config), dest, file.size, on_progress)
+        fetch(req(config), url(rel, config), dest, file.size, on_progress)
       end
     end
   end
 
-  defp fetch(url, dest, size, on_progress) do
+  defp fetch(req, url, dest, size, on_progress) do
     part = dest <> ".part"
     File.mkdir_p!(Path.dirname(dest))
 
     result =
       File.open!(part, [:write, :binary], fn io ->
-        Req.get(req(),
+        Req.get(req,
           url: url,
           into: fn {:data, data}, {req, resp} ->
             if resp.status == 200 do
@@ -88,16 +88,15 @@ defmodule Boxmon.Downloader do
     encoded =
       rel
       |> Path.split()
-      |> Enum.map_join("/", &URI.encode(&1, fn c -> URI.char_unreserved?(c) end))
+      |> Enum.map_join("/", fn segment -> URI.encode(segment, &URI.char_unreserved?/1) end)
 
     String.trim_trailing(config[:http_url], "/") <> "/" <> encoded
   end
 
-  defp req do
-    config = config()
-
+  # No retries: a retry would append the body to the .part file a second time.
+  defp req(config) do
     Req.new(auth: {:basic, "#{config[:http_user]}:#{config[:http_pass]}"}, retry: false)
-    |> Req.merge(config[:req_options] || [])
+    |> Req.merge(Keyword.get(config, :req_options, []))
   end
 
   defp config, do: Application.fetch_env!(:boxmon, :seedbox)

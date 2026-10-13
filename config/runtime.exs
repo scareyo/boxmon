@@ -23,13 +23,14 @@ end
 config :boxmon, BoxmonWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Required to run; tests configure the seedbox in config/test.exs.
 if config_env() != :test do
   config :boxmon, :seedbox,
-    qbit_url: System.get_env("QBIT_URL"),
-    qbit_user: System.get_env("QBIT_USER"),
-    qbit_pass: System.get_env("QBIT_PASS"),
+    qbit_url: System.fetch_env!("QBIT_URL"),
+    qbit_user: System.fetch_env!("QBIT_USER"),
+    qbit_pass: System.fetch_env!("QBIT_PASS"),
     remote_root: System.get_env("REMOTE_ROOT", "/"),
-    http_url: System.get_env("HTTP_URL"),
+    http_url: System.fetch_env!("HTTP_URL"),
     http_user: System.get_env("HTTP_USER"),
     http_pass: System.get_env("HTTP_PASS"),
     download_dir: System.get_env("DOWNLOAD_DIR", "downloads")

@@ -60,70 +60,68 @@ defmodule BoxmonWeb.DashboardLive do
         <li :if={@snap.torrents == []} class="px-4 py-10 text-center text-sm opacity-60">
           No torrents on the seedbox.
         </li>
-        <li
+        <.torrent_row
           :for={t <- @snap.torrents}
-          id={"torrent-#{t.hash}"}
-          class="space-y-2 px-4 py-3 transition hover:bg-base-200/50"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <p class="truncate font-medium" title={t.name}>{t.name}</p>
-            <.badge status={Map.get(@snap.status, t.hash)} torrent={t} />
-          </div>
-
-          <.bar
-            label="Seedbox"
-            value={t.progress}
-            class={if(t.progress == 1, do: "bg-success", else: "bg-info")}
-          />
-          <.bar
-            :if={Map.get(@snap.status, t.hash) == :downloading}
-            label="Local"
-            value={Map.get(@snap.progress, t.hash, 0) / max(t.size, 1)}
-            class="bg-primary"
-          />
-
-          <%= case Map.get(@snap.status, t.hash) do %>
-            <% {:failed, reason} -> %>
-              <div class="flex items-center justify-between gap-3 text-sm">
-                <span class="truncate text-error" title={reason}>{reason}</span>
-                <button
-                  id={"retry-#{t.hash}"}
-                  phx-click="retry"
-                  phx-value-hash={t.hash}
-                  class="shrink-0 rounded-md px-2 py-1 font-medium text-primary transition hover:bg-primary/10"
-                >
-                  Retry
-                </button>
-              </div>
-            <% _ -> %>
-          <% end %>
-
-          <p class="text-xs opacity-60">{format_size(t.size)} · {t.state}</p>
-        </li>
+          torrent={t}
+          status={Map.get(@snap.status, t.hash)}
+          bytes={@snap.bytes}
+        />
       </ul>
     </Layouts.app>
     """
   end
 
-  attr :status, :any, required: true
   attr :torrent, :map, required: true
+  attr :status, :any, required: true
+  attr :bytes, :integer, required: true
 
-  defp badge(assigns) do
-    {text, class} =
-      case assigns.status do
-        :done -> {"Downloaded", "bg-success/15 text-success"}
-        :downloading -> {"Downloading", "bg-primary/15 text-primary"}
-        {:failed, _} -> {"Failed", "bg-error/15 text-error"}
-        nil when assigns.torrent.progress == 1 -> {"Queued", "bg-base-300"}
-        nil -> {"On seedbox", "bg-base-300 opacity-70"}
-      end
-
-    assigns = assign(assigns, text: text, class: class)
+  defp torrent_row(assigns) do
+    {text, class} = badge(assigns.status, assigns.torrent.progress)
+    assigns = assign(assigns, badge_text: text, badge_class: class)
 
     ~H"""
-    <span class={["shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium", @class]}>{@text}</span>
+    <li id={"torrent-#{@torrent.hash}"} class="space-y-2 px-4 py-3 transition hover:bg-base-200/50">
+      <div class="flex items-center justify-between gap-3">
+        <p class="truncate font-medium" title={@torrent.name}>{@torrent.name}</p>
+        <span class={["shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium", @badge_class]}>
+          {@badge_text}
+        </span>
+      </div>
+
+      <.bar
+        label="Seedbox"
+        value={@torrent.progress}
+        class={if(@torrent.progress == 1, do: "bg-success", else: "bg-info")}
+      />
+      <.bar
+        :if={@status == :downloading}
+        label="Local"
+        value={@bytes / max(@torrent.size, 1)}
+        class="bg-primary"
+      />
+
+      <div :if={match?({:failed, _}, @status)} class="flex items-center justify-between gap-3 text-sm">
+        <span class="truncate text-error" title={elem(@status, 1)}>{elem(@status, 1)}</span>
+        <button
+          id={"retry-#{@torrent.hash}"}
+          phx-click="retry"
+          phx-value-hash={@torrent.hash}
+          class="shrink-0 rounded-md px-2 py-1 font-medium text-primary transition hover:bg-primary/10"
+        >
+          Retry
+        </button>
+      </div>
+
+      <p class="text-xs opacity-60">{format_size(@torrent.size)} · {@torrent.state}</p>
+    </li>
     """
   end
+
+  defp badge(:done, _), do: {"Downloaded", "bg-success/15 text-success"}
+  defp badge(:downloading, _), do: {"Downloading", "bg-primary/15 text-primary"}
+  defp badge({:failed, _}, _), do: {"Failed", "bg-error/15 text-error"}
+  defp badge(nil, progress) when progress == 1, do: {"Queued", "bg-base-300"}
+  defp badge(nil, _), do: {"On seedbox", "bg-base-300 opacity-70"}
 
   attr :label, :string, required: true
   attr :value, :any, required: true

@@ -8,21 +8,14 @@ defmodule BoxmonWeb.DashboardLiveTest do
   @moduletag :tmp_dir
   @moduletag :capture_log
 
-  setup :set_req_test_to_shared
+  setup {Req.Test, :set_req_test_to_shared}
 
   setup %{tmp_dir: dir} do
     FakeSeedbox.put_download_dir(dir)
 
     FakeSeedbox.stub(
       torrents: [
-        %{
-          "hash" => "abc",
-          "name" => "Some Show",
-          "size" => 2,
-          "progress" => 1,
-          "state" => "uploading",
-          "save_path" => "/data"
-        }
+        FakeSeedbox.torrent("abc", 1)
       ],
       files: %{"abc" => [%{"name" => "show.mkv", "size" => 2, "priority" => 1}]}
     )
@@ -51,6 +44,4 @@ defmodule BoxmonWeb.DashboardLiveTest do
     assert_receive {:monitor, %{polled_at: %DateTime{}}}
     assert has_element?(view, "#torrent-abc")
   end
-
-  defp set_req_test_to_shared(context), do: Req.Test.set_req_test_to_shared(context)
 end

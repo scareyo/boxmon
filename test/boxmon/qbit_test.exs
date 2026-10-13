@@ -36,8 +36,11 @@ defmodule Boxmon.QbitTest do
     assert {:error, "qBittorrent login failed: bad credentials"} = Qbit.login()
   end
 
-  test "reports HTTP errors" do
+  test "treats 403 as an expired session and reports other HTTP errors" do
     Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, 403, "Forbidden"))
-    assert {:error, "qBittorrent /api/v2/torrents/info: HTTP 403"} = Qbit.torrents("expired")
+    assert {:error, :forbidden} = Qbit.torrents("expired")
+
+    Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, 500, "oops"))
+    assert {:error, "qBittorrent /api/v2/torrents/info: HTTP 500"} = Qbit.torrents("abc")
   end
 end

@@ -7,18 +7,17 @@ defmodule Boxmon.Application do
 
   @impl true
   def start(_type, _args) do
+    # Tests start their own Monitor once their HTTP stubs are in place.
+    monitor =
+      if Application.get_env(:boxmon, :start_monitor, true), do: [Boxmon.Monitor], else: []
+
     children =
       [
         BoxmonWeb.Telemetry,
         {DNSCluster, query: Application.get_env(:boxmon, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Boxmon.PubSub},
         {Task.Supervisor, name: Boxmon.TaskSup}
-      ] ++
-        if(Application.get_env(:boxmon, :start_monitor, true), do: [Boxmon.Monitor], else: []) ++
-        [
-          # Start to serve requests, typically the last entry
-          BoxmonWeb.Endpoint
-        ]
+      ] ++ monitor ++ [BoxmonWeb.Endpoint]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

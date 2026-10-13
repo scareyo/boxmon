@@ -6,7 +6,7 @@ defmodule Boxmon.MonitorTest do
   @moduletag :tmp_dir
   @moduletag :capture_log
 
-  setup :set_req_test_to_shared
+  setup {Req.Test, :set_req_test_to_shared}
 
   setup %{tmp_dir: dir} do
     FakeSeedbox.put_download_dir(dir)
@@ -14,20 +14,9 @@ defmodule Boxmon.MonitorTest do
     :ok
   end
 
-  defp torrent(hash, progress) do
-    %{
-      "hash" => hash,
-      "name" => hash,
-      "size" => 2,
-      "progress" => progress,
-      "state" => "uploading",
-      "save_path" => "/data"
-    }
-  end
-
   test "downloads completed torrents and leaves incomplete ones", %{tmp_dir: dir} do
     FakeSeedbox.stub(
-      torrents: [torrent("partial", 0.5), torrent("done", 1)],
+      torrents: [FakeSeedbox.torrent("partial", 0.5), FakeSeedbox.torrent("done", 1)],
       files: %{"done" => [%{"name" => "done.txt", "size" => 2, "priority" => 1}]},
       content: %{"/dl/done.txt" => "ok"}
     )
@@ -41,7 +30,7 @@ defmodule Boxmon.MonitorTest do
 
   test "marks failed downloads and retries on request" do
     FakeSeedbox.stub(
-      torrents: [torrent("bad", 1)],
+      torrents: [FakeSeedbox.torrent("bad", 1)],
       files: %{"bad" => [%{"name" => "missing.txt", "size" => 2, "priority" => 1}]}
     )
 
@@ -59,6 +48,4 @@ defmodule Boxmon.MonitorTest do
     start_supervised!(Monitor)
     assert_receive {:monitor, %{error: error}} when is_binary(error)
   end
-
-  defp set_req_test_to_shared(context), do: Req.Test.set_req_test_to_shared(context)
 end

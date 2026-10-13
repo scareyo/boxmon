@@ -3,7 +3,8 @@ defmodule Boxmon.Monitor do
   Polls qBittorrent and downloads completed torrents, one at a time.
 
   All state lives here and is broadcast to `subscribe/0`rs as
-  `{:monitor, snapshot}` whenever it changes.
+  `{:monitor, snapshot}` whenever it changes. HTTP work runs in tasks so
+  `snapshot/0` never waits on a slow seedbox.
   """
   use GenServer
   require Logger
@@ -28,12 +29,13 @@ defmodule Boxmon.Monitor do
      %{
        sid: nil,
        timer: nil,
+       polling: nil,
        current: nil,
        broadcast_at: 0,
        # what the UI sees:
        torrents: [],
        status: %{},
-       progress: %{},
+       bytes: 0,
        error: nil,
        polled_at: nil
      }}
@@ -49,25 +51,26 @@ defmodule Boxmon.Monitor do
   end
 
   @impl true
-  def handle_info(:poll, state) do
+  def handle_info(:poll, %{polling: nil} = state) do
     if state.timer, do: Process.cancel_timer(state.timer)
-    state = %{state | timer: Process.send_after(self(), :poll, @interval)}
-
-    state =
-      case fetch_torrents(state.sid) do
-        {:ok, sid, torrents} ->
-          %{state | sid: sid, torrents: torrents, error: nil, polled_at: DateTime.utc_now()}
-
-        {:error, reason} ->
-          Logger.warning("Polling qBittorrent failed: #{reason}")
-          %{state | sid: nil, error: reason}
-      end
-
-    {:noreply, state |> maybe_start_download() |> broadcast()}
+    sid = state.sid
+    task = Task.Supervisor.async_nolink(Boxmon.TaskSup, fn -> fetch_torrents(sid) end)
+    {:noreply, %{state | timer: nil, polling: task.ref}}
   end
 
-  def handle_info({:progress, hash, bytes}, state) do
-    state = %{state | progress: Map.update(state.progress, hash, bytes, &(&1 + bytes))}
+  def handle_info(:poll, state), do: {:noreply, state}
+
+  def handle_info({ref, result}, %{polling: ref} = state) do
+    Process.demonitor(ref, [:flush])
+    polled(state, result)
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{polling: ref} = state) do
+    polled(state, {:error, "poll crashed: #{inspect(reason)}"})
+  end
+
+  def handle_info({:progress, bytes}, state) do
+    state = %{state | bytes: state.bytes + bytes}
 
     # Progress arrives per chunk, so only tell the UI about once a second.
     if System.monotonic_time(:millisecond) - state.broadcast_at >= 1000 do
@@ -98,6 +101,22 @@ defmodule Boxmon.Monitor do
     finish(state, hash, {:failed, "crashed: #{inspect(reason)}"})
   end
 
+  defp polled(state, result) do
+    state = %{state | polling: nil, timer: Process.send_after(self(), :poll, @interval)}
+
+    state =
+      case result do
+        {:ok, sid, torrents} ->
+          %{state | sid: sid, torrents: torrents, error: nil, polled_at: DateTime.utc_now()}
+
+        {:error, reason} ->
+          Logger.warning("Polling qBittorrent failed: #{reason}")
+          %{state | sid: nil, error: to_string(reason)}
+      end
+
+    {:noreply, state |> maybe_start_download() |> broadcast()}
+  end
+
   defp finish(state, hash, status) do
     state = %{state | current: nil, status: Map.put(state.status, hash, status)}
     {:noreply, state |> maybe_start_download() |> broadcast()}
@@ -114,15 +133,13 @@ defmodule Boxmon.Monitor do
   defp fetch_torrents(sid) do
     case Qbit.torrents(sid) do
       {:ok, torrents} -> {:ok, sid, torrents}
-      {:error, _} -> fetch_torrents(nil)
+      {:error, :forbidden} -> fetch_torrents(nil)
+      error -> error
     end
   end
 
   defp maybe_start_download(%{current: nil, sid: sid} = state) when sid != nil do
-    case Enum.find(
-           state.torrents,
-           &(&1.progress == 1 and not Map.has_key?(state.status, &1.hash))
-         ) do
+    case next_torrent(state) do
       nil ->
         state
 
@@ -132,7 +149,7 @@ defmodule Boxmon.Monitor do
         task =
           Task.Supervisor.async_nolink(Boxmon.TaskSup, fn ->
             with {:ok, files} <- Qbit.files(sid, torrent.hash) do
-              Downloader.download(torrent, files, &send(monitor, {:progress, torrent.hash, &1}))
+              Downloader.download(torrent, files, &send(monitor, {:progress, &1}))
             end
           end)
 
@@ -140,17 +157,21 @@ defmodule Boxmon.Monitor do
           state
           | current: {torrent.hash, task.ref},
             status: Map.put(state.status, torrent.hash, :downloading),
-            progress: Map.put(state.progress, torrent.hash, 0)
+            bytes: 0
         }
     end
   end
 
   defp maybe_start_download(state), do: state
 
+  defp next_torrent(state) do
+    Enum.find(state.torrents, &(&1.progress == 1 and not Map.has_key?(state.status, &1.hash)))
+  end
+
   defp broadcast(state) do
     Phoenix.PubSub.broadcast(Boxmon.PubSub, @topic, {:monitor, snapshot(state)})
     %{state | broadcast_at: System.monotonic_time(:millisecond)}
   end
 
-  defp snapshot(state), do: Map.take(state, [:torrents, :status, :progress, :error, :polled_at])
+  defp snapshot(state), do: Map.take(state, [:torrents, :status, :bytes, :error, :polled_at])
 end
