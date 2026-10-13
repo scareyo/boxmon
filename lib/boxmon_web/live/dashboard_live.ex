@@ -65,6 +65,7 @@ defmodule BoxmonWeb.DashboardLive do
           torrent={t}
           status={Map.get(@snap.status, t.hash)}
           bytes={@snap.bytes}
+          speed={@snap.speed}
         />
       </ul>
     </Layouts.app>
@@ -74,6 +75,7 @@ defmodule BoxmonWeb.DashboardLive do
   attr :torrent, :map, required: true
   attr :status, :any, required: true
   attr :bytes, :integer, required: true
+  attr :speed, :integer, required: true
 
   defp torrent_row(assigns) do
     {text, class} = badge(assigns.status, assigns.torrent.progress)
@@ -112,7 +114,12 @@ defmodule BoxmonWeb.DashboardLive do
         </button>
       </div>
 
-      <p class="text-xs opacity-60">{format_size(@torrent.size)} · {@torrent.state}</p>
+      <p class="text-xs opacity-60">
+        {format_size(@torrent.size)} · {@torrent.state}
+        <span :if={@status == :downloading} id={"speed-#{@torrent.hash}"} class="tabular-nums">
+          · {format_size(@speed)}/s
+        </span>
+      </p>
     </li>
     """
   end

@@ -31,10 +31,12 @@ defmodule Boxmon.Monitor do
        polling: nil,
        current: nil,
        broadcast_at: 0,
+       broadcast_bytes: 0,
        # what the UI sees:
        torrents: [],
        status: %{},
        bytes: 0,
+       speed: 0,
        error: nil,
        polled_at: nil
      }}
@@ -69,10 +71,12 @@ defmodule Boxmon.Monitor do
 
   def handle_info({:progress, bytes}, state) do
     state = %{state | bytes: state.bytes + bytes}
+    elapsed = System.monotonic_time(:millisecond) - state.broadcast_at
 
     # Progress arrives per chunk, so only tell the UI about once a second.
-    if System.monotonic_time(:millisecond) - state.broadcast_at >= 1000 do
-      {:noreply, broadcast(state)}
+    if elapsed >= 1000 do
+      speed = div((state.bytes - state.broadcast_bytes) * 1000, elapsed)
+      {:noreply, broadcast(%{state | speed: speed})}
     else
       {:noreply, state}
     end
@@ -139,7 +143,8 @@ defmodule Boxmon.Monitor do
           state
           | current: {torrent.hash, task.ref},
             status: Map.put(state.status, torrent.hash, :downloading),
-            bytes: 0
+            bytes: 0,
+            speed: 0
         }
     end
   end
@@ -152,8 +157,9 @@ defmodule Boxmon.Monitor do
 
   defp broadcast(state) do
     Phoenix.PubSub.broadcast(Boxmon.PubSub, @topic, {:monitor, snapshot(state)})
-    %{state | broadcast_at: System.monotonic_time(:millisecond)}
+    %{state | broadcast_at: System.monotonic_time(:millisecond), broadcast_bytes: state.bytes}
   end
 
-  defp snapshot(state), do: Map.take(state, [:torrents, :status, :bytes, :error, :polled_at])
+  defp snapshot(state),
+    do: Map.take(state, [:torrents, :status, :bytes, :speed, :error, :polled_at])
 end
