@@ -76,8 +76,8 @@ defmodule Boxmon.Monitor do
     state = %{state | bytes: state.bytes + bytes}
     elapsed = System.monotonic_time(:millisecond) - state.broadcast_at
 
-    # Progress arrives per chunk, so only tell the UI about once a second.
-    if elapsed >= 1000 do
+    # Progress arrives per chunk, so only tell the UI about 4 times a second.
+    if elapsed >= 250 do
       speed = div((state.bytes - state.broadcast_bytes) * 1000, elapsed)
       {:noreply, broadcast(%{state | speed: speed})}
     else

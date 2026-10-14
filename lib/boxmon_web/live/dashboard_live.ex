@@ -135,18 +135,19 @@ defmodule BoxmonWeb.DashboardLive do
   attr :class, :string, required: true
 
   defp bar(assigns) do
-    assigns = assign(assigns, :pct, min(round(assigns.value * 100), 100))
+    pct = min(assigns.value * 100, 100) / 1
+    assigns = assign(assigns, :pct, :erlang.float_to_binary(pct, decimals: 1))
 
     ~H"""
     <div class="flex items-center gap-3 text-xs">
       <span class="w-14 opacity-60">{@label}</span>
       <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-base-300">
         <div
-          class={["h-full rounded-full transition-all duration-500", @class]}
+          class={["h-full rounded-full transition-all duration-200", @class]}
           style={"width: #{@pct}%"}
         />
       </div>
-      <span class="w-10 text-right tabular-nums">{@pct}%</span>
+      <span class="w-12 text-right tabular-nums">{@pct}%</span>
     </div>
     """
   end
