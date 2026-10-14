@@ -27,8 +27,13 @@ defmodule Boxmon.QbitTest do
     assert {:ok, []} = Qbit.torrents()
   end
 
-  test "reports HTTP errors" do
-    Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, 403, "Forbidden"))
-    assert {:error, "qBittorrent /api/v2/torrents/info: HTTP 403"} = Qbit.torrents()
+  test "reports auth failures and other HTTP errors" do
+    for status <- [401, 403] do
+      Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, status, "Forbidden"))
+      assert {:error, :unauthorized} = Qbit.torrents()
+    end
+
+    Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, 500, "oops"))
+    assert {:error, "qBittorrent /api/v2/torrents/info: HTTP 500"} = Qbit.torrents()
   end
 end

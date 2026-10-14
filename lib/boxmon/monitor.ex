@@ -12,6 +12,8 @@ defmodule Boxmon.Monitor do
   alias Boxmon.{Downloader, Qbit}
 
   @interval :timer.seconds(30)
+  # Stay under qBittorrent's default of 5 failed auth attempts before an IP ban.
+  @max_auth_failures 3
   @topic "monitor"
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
@@ -32,6 +34,7 @@ defmodule Boxmon.Monitor do
        current: nil,
        broadcast_at: 0,
        broadcast_bytes: 0,
+       auth_failures: 0,
        # what the UI sees:
        torrents: [],
        status: %{},
@@ -104,19 +107,44 @@ defmodule Boxmon.Monitor do
   end
 
   defp polled(state, result) do
-    state = %{state | polling: nil, timer: Process.send_after(self(), :poll, @interval)}
-
     state =
       case result do
         {:ok, torrents} ->
-          %{state | torrents: torrents, error: nil, polled_at: DateTime.utc_now()}
+          %{
+            state
+            | torrents: torrents,
+              error: nil,
+              auth_failures: 0,
+              polled_at: DateTime.utc_now()
+          }
+
+        {:error, :unauthorized} ->
+          failures = state.auth_failures + 1
+          error = auth_error(failures)
+          Logger.warning("Polling qBittorrent failed: #{error}")
+          %{state | auth_failures: failures, error: error}
 
         {:error, reason} ->
           Logger.warning("Polling qBittorrent failed: #{reason}")
           %{state | error: reason}
       end
 
+    # After too many auth failures, only "Check now" (poll_now/0) polls again.
+    timer =
+      if state.auth_failures < @max_auth_failures,
+        do: Process.send_after(self(), :poll, @interval)
+
+    state = %{state | polling: nil, timer: timer}
     {:noreply, state |> maybe_start_download() |> broadcast()}
+  end
+
+  defp auth_error(failures) when failures < @max_auth_failures do
+    "qBittorrent rejected the API key (attempt #{failures} of #{@max_auth_failures})"
+  end
+
+  defp auth_error(failures) do
+    "qBittorrent rejected the API key #{failures} times, so polling has stopped to avoid an IP ban. " <>
+      "Fix QBIT_API_KEY, then press Check now."
   end
 
   defp finish(state, hash, status) do

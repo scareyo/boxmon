@@ -30,9 +30,12 @@ defmodule Boxmon.Qbit do
     end
   end
 
+  # 401/403 means a bad API key. Callers must not keep retrying those: qBittorrent
+  # bans the IP after a few failed auth attempts.
   defp get(url, params) do
     case Req.get(req(), url: url, params: params) do
       {:ok, %{status: 200, body: body}} -> {:ok, body}
+      {:ok, %{status: status}} when status in [401, 403] -> {:error, :unauthorized}
       {:ok, resp} -> {:error, "qBittorrent #{url}: HTTP #{resp.status}"}
       {:error, exception} -> {:error, "qBittorrent: #{Exception.message(exception)}"}
     end

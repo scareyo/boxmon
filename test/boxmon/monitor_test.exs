@@ -42,6 +42,25 @@ defmodule Boxmon.MonitorTest do
     assert_receive {:monitor, %{status: %{"bad" => {:failed, _}}}}
   end
 
+  test "stops polling after repeated auth failures until checked manually" do
+    Req.Test.stub(Boxmon.Seedbox, &Plug.Conn.send_resp(&1, 403, "Forbidden"))
+    start_supervised!(Monitor)
+    assert_receive {:monitor, %{error: "qBittorrent rejected the API key (attempt 1 of 3)"}}
+
+    Monitor.poll_now()
+    assert_receive {:monitor, %{error: "qBittorrent rejected the API key (attempt 2 of 3)"}}
+
+    Monitor.poll_now()
+    assert_receive {:monitor, %{error: "qBittorrent rejected the API key 3 times" <> _}}
+    assert %{timer: nil, auth_failures: 3} = :sys.get_state(Monitor)
+
+    FakeSeedbox.stub(torrents: [])
+    Monitor.poll_now()
+    assert_receive {:monitor, %{error: nil}}
+    assert %{auth_failures: 0, timer: timer} = :sys.get_state(Monitor)
+    assert is_reference(timer)
+  end
+
   test "shows an error when qBittorrent is unreachable" do
     Req.Test.stub(Boxmon.Seedbox, &Req.Test.transport_error(&1, :econnrefused))
 
