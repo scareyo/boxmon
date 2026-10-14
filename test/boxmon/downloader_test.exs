@@ -9,7 +9,7 @@ defmodule Boxmon.DownloaderTest do
   @files [%{name: "My Show/ep 1.mkv", size: 5}, %{name: "My Show/ep2.mkv", size: 3}]
 
   setup %{tmp_dir: dir} do
-    FakeSeedbox.put_download_dir(dir)
+    FakeSeedbox.put_config(:download_dir, dir)
   end
 
   test "downloads every file to the same relative path", %{tmp_dir: dir} do

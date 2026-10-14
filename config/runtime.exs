@@ -39,7 +39,8 @@ if config_env() != :test do
     http_pass: System.get_env("HTTP_PASS"),
     download_dir: System.get_env("DOWNLOAD_DIR", "downloads"),
     chunk_size: chunk_size_mb * 1024 * 1024,
-    connections: connections
+    connections: connections,
+    categories: String.split(System.get_env("CATEGORIES", ""), ",", trim: true)
 end
 
 if config_env() == :prod do

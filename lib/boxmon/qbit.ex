@@ -4,10 +4,13 @@ defmodule Boxmon.Qbit do
   (qBittorrent 5.2+, generated under Options → WebUI).
   """
 
+  @doc "Lists torrents in the configured `categories`; none if that's empty."
   def torrents do
+    categories = Application.fetch_env!(:boxmon, :seedbox)[:categories]
+
     with {:ok, torrents} <- get("/api/v2/torrents/info", []) do
       {:ok,
-       Enum.map(torrents, fn t ->
+       for t <- torrents, t["category"] in categories do
          %{
            hash: t["hash"],
            name: t["name"],
@@ -16,7 +19,7 @@ defmodule Boxmon.Qbit do
            state: t["state"],
            save_path: t["save_path"]
          }
-       end)}
+       end}
     end
   end
 

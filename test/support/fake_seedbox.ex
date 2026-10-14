@@ -22,14 +22,15 @@ defmodule Boxmon.FakeSeedbox do
       "size" => 2,
       "progress" => progress,
       "state" => "uploading",
-      "save_path" => "/data"
+      "save_path" => "/data",
+      "category" => "tv"
     }
   end
 
-  @doc "Points downloads at `dir` for the rest of the test."
-  def put_download_dir(dir) do
+  @doc "Overrides a `:seedbox` config key for the rest of the test."
+  def put_config(key, value) do
     config = Application.fetch_env!(:boxmon, :seedbox)
-    Application.put_env(:boxmon, :seedbox, Keyword.put(config, :download_dir, dir))
+    Application.put_env(:boxmon, :seedbox, Keyword.put(config, key, value))
     ExUnit.Callbacks.on_exit(fn -> Application.put_env(:boxmon, :seedbox, config) end)
   end
 

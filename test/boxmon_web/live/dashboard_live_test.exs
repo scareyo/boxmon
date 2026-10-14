@@ -11,7 +11,7 @@ defmodule BoxmonWeb.DashboardLiveTest do
   setup {Req.Test, :set_req_test_to_shared}
 
   setup %{tmp_dir: dir} do
-    FakeSeedbox.put_download_dir(dir)
+    FakeSeedbox.put_config(:download_dir, dir)
 
     FakeSeedbox.stub(
       torrents: [
@@ -35,6 +35,17 @@ defmodule BoxmonWeb.DashboardLiveTest do
     view |> element("#retry-abc") |> render_click()
     assert_receive {:monitor, %{status: %{"abc" => {:failed, _}}}}
     assert has_element?(view, "#retry-abc")
+  end
+
+  test "shows the monitored categories", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+    assert view |> element("#categories") |> render() =~ "tv"
+    refute has_element?(view, "#no-categories")
+
+    FakeSeedbox.put_config(:categories, [])
+    {:ok, view, _html} = live(conn, ~p"/")
+    assert has_element?(view, "#no-categories")
+    refute has_element?(view, "#categories")
   end
 
   test "can poll on demand", %{conn: conn} do

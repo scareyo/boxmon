@@ -1,5 +1,5 @@
 defmodule Boxmon.QbitTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Boxmon.{FakeSeedbox, Qbit}
 
@@ -16,6 +16,21 @@ defmodule Boxmon.QbitTest do
 
     assert {:ok, [%{hash: "h1", progress: 1, save_path: "/data"}]} = Qbit.torrents()
     assert {:ok, [%{name: "h1/a.mkv", size: 2}]} = Qbit.files("h1")
+  end
+
+  test "only lists torrents in the configured categories" do
+    FakeSeedbox.stub(
+      torrents: [
+        FakeSeedbox.torrent("h1", 1),
+        %{FakeSeedbox.torrent("h2", 1) | "category" => "movies"},
+        %{FakeSeedbox.torrent("h3", 1) | "category" => ""}
+      ]
+    )
+
+    assert {:ok, [%{hash: "h1"}]} = Qbit.torrents()
+
+    FakeSeedbox.put_config(:categories, [])
+    assert {:ok, []} = Qbit.torrents()
   end
 
   test "sends the API key as a bearer token" do

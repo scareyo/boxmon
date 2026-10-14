@@ -40,4 +40,5 @@ config :boxmon, :seedbox,
   download_dir: "tmp/test-downloads",
   chunk_size: 4,
   connections: 4,
+  categories: ["tv"],
   req_options: [plug: {Req.Test, Boxmon.Seedbox}, retry: false]

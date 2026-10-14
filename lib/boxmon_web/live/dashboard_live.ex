@@ -6,7 +6,8 @@ defmodule BoxmonWeb.DashboardLive do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Monitor.subscribe()
-    {:ok, assign(socket, snap: Monitor.snapshot())}
+    categories = Application.fetch_env!(:boxmon, :seedbox)[:categories]
+    {:ok, assign(socket, snap: Monitor.snapshot(), categories: categories)}
   end
 
   @impl true
@@ -47,6 +48,21 @@ defmodule BoxmonWeb.DashboardLive do
         </button>
       </div>
 
+      <div :if={@categories != []} id="categories" class="flex flex-wrap gap-1.5 text-xs">
+        <span :for={c <- @categories} class="rounded-full bg-base-200 px-2.5 py-0.5 font-medium">
+          {c}
+        </span>
+      </div>
+
+      <div
+        :if={@categories == []}
+        id="no-categories"
+        class="flex items-start gap-2 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error"
+      >
+        <.icon name="hero-exclamation-triangle" class="mt-0.5 size-4 shrink-0" />
+        <span>No categories are monitored, so nothing will download. Set CATEGORIES.</span>
+      </div>
+
       <div
         :if={@snap.error}
         id="seedbox-error"
@@ -58,7 +74,7 @@ defmodule BoxmonWeb.DashboardLive do
 
       <ul id="torrents" class="divide-y divide-base-300 rounded-xl border border-base-300">
         <li :if={@snap.torrents == []} class="px-4 py-10 text-center text-sm opacity-60">
-          No torrents on the seedbox.
+          No torrents in the monitored categories.
         </li>
         <.torrent_row
           :for={t <- @snap.torrents}

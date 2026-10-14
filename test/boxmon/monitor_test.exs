@@ -9,7 +9,7 @@ defmodule Boxmon.MonitorTest do
   setup {Req.Test, :set_req_test_to_shared}
 
   setup %{tmp_dir: dir} do
-    FakeSeedbox.put_download_dir(dir)
+    FakeSeedbox.put_config(:download_dir, dir)
     Monitor.subscribe()
     :ok
   end
