@@ -35,8 +35,8 @@ defmodule BoxmonWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="border-b border-base-300">
-      <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
+    <header class="border-b border-base-300 px-4 sm:px-6">
+      <div class="mx-auto flex max-w-3xl items-center justify-between py-4">
         <a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <.icon name="hero-cloud-arrow-down" class="size-6 text-primary" /> Boxmon
         </a>
