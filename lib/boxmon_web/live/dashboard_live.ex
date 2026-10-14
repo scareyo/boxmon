@@ -96,10 +96,10 @@ defmodule BoxmonWeb.DashboardLive do
         class={if(@torrent.progress == 1, do: "bg-success", else: "bg-info")}
       />
       <.bar
-        :if={@status == :downloading}
+        :if={@status in [:downloading, :done]}
         label="Local"
-        value={@bytes / max(@torrent.size, 1)}
-        class="bg-primary"
+        value={if(@status == :done, do: 1, else: @bytes / max(@torrent.size, 1))}
+        class={if(@status == :done, do: "bg-success", else: "bg-primary")}
       />
 
       <div :if={match?({:failed, _}, @status)} class="flex items-center justify-between gap-3 text-sm">
