@@ -25,6 +25,11 @@ config :boxmon, BoxmonWeb.Endpoint,
 
 # Required to run; tests configure the seedbox in config/test.exs.
 if config_env() != :test do
+  chunk_size_mb = String.to_integer(System.get_env("CHUNK_SIZE_MB", "128"))
+  connections = String.to_integer(System.get_env("CONNECTIONS", "4"))
+  chunk_size_mb > 0 || raise "CHUNK_SIZE_MB must be positive"
+  connections > 0 || raise "CONNECTIONS must be positive"
+
   config :boxmon, :seedbox,
     qbit_url: System.fetch_env!("QBIT_URL"),
     qbit_api_key: System.fetch_env!("QBIT_API_KEY"),
@@ -33,8 +38,8 @@ if config_env() != :test do
     http_user: System.get_env("HTTP_USER"),
     http_pass: System.get_env("HTTP_PASS"),
     download_dir: System.get_env("DOWNLOAD_DIR", "downloads"),
-    chunk_size: String.to_integer(System.get_env("CHUNK_SIZE_MB", "128")) * 1024 * 1024,
-    connections: String.to_integer(System.get_env("CONNECTIONS", "4"))
+    chunk_size: chunk_size_mb * 1024 * 1024,
+    connections: connections
 end
 
 if config_env() == :prod do
