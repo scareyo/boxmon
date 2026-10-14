@@ -7,12 +7,10 @@ defmodule Boxmon.Downloader do
   at that same relative path. Files that already exist locally with the
   right size are skipped, so the local disk is the record of what's done.
 
-  When the server supports byte ranges, large files are fetched in chunks
-  over several parallel connections.
+  When the server supports byte ranges, files larger than `chunk_size`
+  (`CHUNK_SIZE_MB`, default 128) are fetched in chunks over `connections`
+  (`CONNECTIONS`, default 4) parallel connections.
   """
-
-  @chunk_size 16 * 1024 * 1024
-  @connections 4
 
   @doc """
   Downloads every file, calling `on_progress.(bytes)` as bytes arrive.
@@ -41,21 +39,22 @@ defmodule Boxmon.Downloader do
           url(rel, config),
           dest,
           file.size,
-          Keyword.get(config, :chunk_size, @chunk_size),
+          config[:chunk_size],
+          config[:connections],
           on_progress
         )
       end
     end
   end
 
-  defp fetch(req, url, dest, size, chunk_size, on_progress) do
+  defp fetch(req, url, dest, size, chunk_size, connections, on_progress) do
     part = dest <> ".part"
     File.mkdir_p!(Path.dirname(dest))
     File.write!(part, "")
 
     result =
       if size > chunk_size and ranges?(req, url) do
-        fetch_chunks(req, url, part, size, chunk_size, on_progress)
+        fetch_chunks(req, url, part, size, chunk_size, connections, on_progress)
       else
         fetch_range(req, url, part, nil, on_progress)
       end
@@ -76,15 +75,15 @@ defmodule Boxmon.Downloader do
     end
   end
 
-  # Fetches `chunk_size` ranges over @connections parallel connections,
+  # Fetches `chunk_size` ranges over `connections` parallel connections,
   # each writing its range at the right offset in the .part file.
-  defp fetch_chunks(req, url, part, size, chunk_size, on_progress) do
+  defp fetch_chunks(req, url, part, size, chunk_size, connections, on_progress) do
     0..(size - 1)//chunk_size
     |> Task.async_stream(
       fn from ->
         fetch_range(req, url, part, {from, min(from + chunk_size, size) - 1}, on_progress)
       end,
-      max_concurrency: @connections,
+      max_concurrency: connections,
       ordered: false,
       timeout: :infinity
     )

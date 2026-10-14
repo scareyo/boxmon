@@ -32,7 +32,9 @@ if config_env() != :test do
     http_url: System.fetch_env!("HTTP_URL"),
     http_user: System.get_env("HTTP_USER"),
     http_pass: System.get_env("HTTP_PASS"),
-    download_dir: System.get_env("DOWNLOAD_DIR", "downloads")
+    download_dir: System.get_env("DOWNLOAD_DIR", "downloads"),
+    chunk_size: String.to_integer(System.get_env("CHUNK_SIZE_MB", "128")) * 1024 * 1024,
+    connections: String.to_integer(System.get_env("CONNECTIONS", "4"))
 end
 
 if config_env() == :prod do
