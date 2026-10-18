@@ -28,6 +28,16 @@ defmodule Boxmon.MonitorTest do
     assert File.read!(Path.join(dir, "done.txt")) == "ok"
   end
 
+  test "creates the download dir on start", %{tmp_dir: dir} do
+    dest = Path.join([dir, "new", "downloads"])
+    FakeSeedbox.put_config(:download_dir, dest)
+    FakeSeedbox.stub([])
+
+    start_supervised!(Monitor)
+
+    assert File.dir?(dest)
+  end
+
   test "marks failed downloads and retries on request" do
     FakeSeedbox.stub(
       torrents: [FakeSeedbox.torrent("bad", 1)],

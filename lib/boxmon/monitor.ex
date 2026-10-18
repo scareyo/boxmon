@@ -25,6 +25,8 @@ defmodule Boxmon.Monitor do
 
   @impl true
   def init(nil) do
+    # Fail at boot, not on the first download, if DOWNLOAD_DIR can't be created.
+    File.mkdir_p!(Application.fetch_env!(:boxmon, :seedbox)[:download_dir])
     send(self(), :poll)
 
     {:ok,
