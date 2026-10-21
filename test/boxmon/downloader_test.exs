@@ -12,7 +12,7 @@ defmodule Boxmon.DownloaderTest do
     FakeSeedbox.put_config(:download_dir, dir)
   end
 
-  test "downloads every file to the same relative path", %{tmp_dir: dir} do
+  test "downloads every file by name into download_dir", %{tmp_dir: dir} do
     FakeSeedbox.stub(
       content: %{"/dl/My%20Show/ep%201.mkv" => "hello", "/dl/My%20Show/ep2.mkv" => "abc"}
     )
@@ -55,6 +55,16 @@ defmodule Boxmon.DownloaderTest do
 
     assert {:error, "ep 1.mkv: HTTP 404"} = Downloader.download(@torrent, @files, fn _ -> :ok end)
     refute File.exists?(Path.join(dir, "My Show/ep 1.mkv"))
+  end
+
+  test "drops the remote directory tree", %{tmp_dir: dir} do
+    torrent = %{@torrent | save_path: "/data/tv"}
+    FakeSeedbox.stub(content: %{"/dl/tv/My%20Show/ep2.mkv" => "abc"})
+    files = [%{name: "My Show/ep2.mkv", size: 3}]
+
+    assert :ok = Downloader.download(torrent, files, fn _ -> :ok end)
+    assert File.read!(Path.join(dir, "My Show/ep2.mkv")) == "abc"
+    refute File.exists?(Path.join(dir, "tv"))
   end
 
   test "rejects files outside the remote root" do

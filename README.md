@@ -11,7 +11,8 @@ local directory over HTTP.
 
 - **Downloads are found by path.** A file at `<save_path>/<name>` on the
   remote machine is fetched from `HTTP_URL/<path relative to REMOTE_ROOT>`, and saved
-  at that same relative path under `DOWNLOAD_DIR`.
+  to `DOWNLOAD_DIR/<name>`. The remote directories above the torrent aren't
+  recreated locally.
 - **The local disk is the record of what's done.** Files that already exist
   locally at the right size are skipped. Nothing else is stored, so after a
   restart Boxmon re-checks every torrent and skips what's already there.
@@ -78,7 +79,7 @@ DOWNLOAD_DIR=/media
 ```
 
 The file is fetched from `https://remote.example.com/files/iso/linux.iso`
-and saved to `/media/iso/linux.iso`.
+and saved to `/media/linux.iso`.
 
 ## Development
 

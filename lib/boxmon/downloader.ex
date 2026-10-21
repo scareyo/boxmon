@@ -3,8 +3,8 @@ defmodule Boxmon.Downloader do
   Downloads a torrent's files from the seedbox's HTTP server.
 
   A torrent file at `<save_path>/<name>` on the seedbox is fetched from
-  `<http_url>/<path relative to remote_root>` and saved under `download_dir`
-  at that same relative path. Files that already exist locally with the
+  `<http_url>/<path relative to remote_root>` and saved to
+  `<download_dir>/<name>`, without the remote directory tree. Files that already exist locally with the
   right size are skipped, so the local disk is the record of what's done.
 
   When the server supports byte ranges, files larger than `chunk_size`
@@ -27,8 +27,9 @@ defmodule Boxmon.Downloader do
   end
 
   defp download_file(torrent, file, config, on_progress) do
-    with {:ok, rel} <- relative_path(Path.join(torrent.save_path, file.name), config) do
-      dest = Path.join(config[:download_dir], rel)
+    with {:ok, rel} <- relative_path(Path.join(torrent.save_path, file.name), config),
+         {:ok, name} <- safe_name(file.name) do
+      dest = Path.join(config[:download_dir], name)
 
       if already_downloaded?(dest, file.size) do
         on_progress.(file.size)
@@ -135,6 +136,14 @@ defmodule Boxmon.Downloader do
       {:ok, rel}
     else
       {:error, "#{remote_path} is not inside REMOTE_ROOT (#{config[:remote_root]})"}
+    end
+  end
+
+  defp safe_name(name) do
+    if Path.type(name) == :relative and ".." not in Path.split(name) do
+      {:ok, name}
+    else
+      {:error, "#{name} is not a relative file name"}
     end
   end
 
