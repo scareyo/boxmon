@@ -53,7 +53,7 @@
           };
 
           container = nix2container.packages.${system}.nix2container.buildImage {
-            name = "ghcr.io/scareyo/${pname}";
+            name = "scarey.dev/scarey/${pname}";
             tag = version;
             copyToRoot = [ pkgs.dockerTools.caCertificates ];
             config.entrypoint = [ "${default}/bin/boxmon" "start" ];

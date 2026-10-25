@@ -1,0 +1,26 @@
+name: Build Container
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  push:
+    runs-on: nix
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: nix build .#container.copyToRegistry
+
+      - run: attic push forgejo-runner ./result
+
+      - name: Log in to the registry
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          echo "$REGISTRY_TOKEN" | skopeo login \
+            --username "${{ github.actor }}" --password-stdin scarey.dev
+
+      - name: Push the container
+        run: nix run .#container.copyToRegistry
+
